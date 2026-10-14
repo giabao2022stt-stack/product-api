@@ -12,6 +12,7 @@ app.get('/health', (req, res) => {
   res.status(connected ? 200 : 503).json({
     status: connected ? 'ok' : 'error',
     db: connected ? 'connected' : 'disconnected',
+    service: 'product-api',
   });
 });
 

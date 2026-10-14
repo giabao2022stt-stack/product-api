@@ -63,3 +63,23 @@ jobs:
       - name: Đăng xuất
         if: always()
         run: docker logout
+    deploy-local:
+    needs: push-dockerhub
+    if: github.ref == 'refs/heads/main'
+    runs-on: self-hosted
+    timeout-minutes: 10
+    steps:
+      - name: Lấy mã nguồn
+        uses: actions/checkout@v6
+
+      - name: Kéo image mới từ Docker Hub
+        run: docker compose -f docker-compose-prod.yaml pull
+
+      - name: Cập nhật container và chờ healthy
+        run: docker compose -f docker-compose-prod.yaml up -d --wait --wait-timeout 120
+
+      - name: Hiển thị trạng thái
+        run: docker compose -f docker-compose-prod.yaml ps
+
+      - name: Smoke test API
+        run: curl.exe -fsS http://localhost:3000/health
