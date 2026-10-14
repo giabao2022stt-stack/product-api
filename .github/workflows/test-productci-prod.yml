@@ -20,41 +20,25 @@ jobs:
 
       - name: Xác nhận trạng thái healthy
         run: |
+          set -euo pipefail
           docker compose ps
+
           for svc in mongodb api; do
-            status=$(docker inspect --format '{{.State.Health.Status}}' "$(docker compose ps -q $svc)")
+            container_id=$(docker compose ps -q "$svc")
+
+            if [ -z "$container_id" ]; then
+              echo "FAIL: Không tìm thấy container $svc"
+              exit 1
+            fi
+
+            status=$(docker inspect --format '{{.State.Health.Status}}' "$container_id")
             echo "$svc: $status"
+
             [ "$status" = "healthy" ] || exit 1
           done
 
-      - name: Kiểm tra CRUD qua HTTP
-        run: |
-          set -euo pipefail
-          BASE=http://localhost:3000
-          JSON='Content-Type: application/json'
-
-          check() {
-            if [ "$2" != "$3" ]; then
-              echo "FAIL: $1 (mong đợi $2, nhận $3)"
-              exit 1
-            fi
-            echo "OK: $1"
-          }
-          http() { curl -s -o /dev/null -w '%{http_code}' "$@"; }
-
-          check "health" 200 "$(http $BASE/health)"
-          check "create" 201 "$(http -X POST $BASE/api/products -H "$JSON" -d '{"pid":1,"pname":"Laptop","price":1200,"quantity":5}')"
-          check "read all" 200 "$(http $BASE/api/products)"
-          curl -s $BASE/api/products | jq -e 'length == 1' > /dev/null
-          check "update" 200 "$(http -X PUT $BASE/api/products/1 -H "$JSON" -d '{"price":1100,"quantity":8}')"
-          curl -s $BASE/api/products/1 | jq -e '.price == 1100 and .quantity == 8' > /dev/null
-          echo "OK: dữ liệu sau khi sửa đúng"
-          check "trùng pid" 409 "$(http -X POST $BASE/api/products -H "$JSON" -d '{"pid":1,"pname":"Trung","price":10,"quantity":1}')"
-          check "giá âm" 400 "$(http -X POST $BASE/api/products -H "$JSON" -d '{"pid":2,"pname":"Am","price":-5,"quantity":1}')"
-          check "pid không phải số" 400 "$(http $BASE/api/products/abc)"
-          check "delete" 200 "$(http -X DELETE $BASE/api/products/1)"
-          check "đã xóa thì 404" 404 "$(http $BASE/api/products/1)"
-          echo "TẤT CẢ KIỂM TRA ĐẠT"
+      - name: Chạy test script CRUD
+        run: npm test
 
       - name: In log khi có lỗi
         if: failure()
