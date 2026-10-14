@@ -6,6 +6,17 @@ const Product = require('./models/product');
 const app = express();
 app.use(express.json());
 
+// Ghi log mỗi yêu cầu sau khi hoàn tất (phục vụ mục 7)
+app.use((req, res, next) => {
+  res.on('finish', () => {
+    console.log(`${new Date().toISOString()} ${req.method} ${req.originalUrl} ${res.statusCode}`);
+  });
+  next();
+});
+
+// Bọc hàm async để lỗi luôn được chuyển tới middleware xử lý lỗi (chạy đúng cả Express 4 và 5)
+const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
+
 // Kiểm tra sức khỏe (dùng cho healthcheck ở Bước 9)
 app.get('/health', (req, res) => {
   const connected = mongoose.connection.readyState === 1;
@@ -27,46 +38,61 @@ const parsePid = (req, res) => {
 };
 
 // CREATE
-app.post('/api/products', async (req, res) => {
-  const product = await Product.create(req.body);
-  res.status(201).json(product);
-});
+app.post(
+  '/api/products',
+  wrap(async (req, res) => {
+    const product = await Product.create(req.body);
+    res.status(201).json(product);
+  })
+);
 
 // READ ALL
-app.get('/api/products', async (req, res) => {
-  res.json(await Product.find().sort({ pid: 1 }));
-});
+app.get(
+  '/api/products',
+  wrap(async (req, res) => {
+    res.json(await Product.find().sort({ pid: 1 }));
+  })
+);
 
 // READ ONE
-app.get('/api/products/:pid', async (req, res) => {
-  const pid = parsePid(req, res);
-  if (pid === null) return;
-  const product = await Product.findOne({ pid });
-  if (!product) return res.status(404).json({ message: 'Không tìm thấy sản phẩm' });
-  res.json(product);
-});
+app.get(
+  '/api/products/:pid',
+  wrap(async (req, res) => {
+    const pid = parsePid(req, res);
+    if (pid === null) return;
+    const product = await Product.findOne({ pid });
+    if (!product) return res.status(404).json({ message: 'Không tìm thấy sản phẩm' });
+    res.json(product);
+  })
+);
 
 // UPDATE (không cho đổi pid)
-app.put('/api/products/:pid', async (req, res) => {
-  const pid = parsePid(req, res);
-  if (pid === null) return;
-  const { pid: _bo_qua, ...data } = req.body;
-  const product = await Product.findOneAndUpdate({ pid }, data, {
-    new: true,
-    runValidators: true,
-  });
-  if (!product) return res.status(404).json({ message: 'Không tìm thấy sản phẩm' });
-  res.json(product);
-});
+app.put(
+  '/api/products/:pid',
+  wrap(async (req, res) => {
+    const pid = parsePid(req, res);
+    if (pid === null) return;
+    const { pid: _bo_qua, ...data } = req.body;
+    const product = await Product.findOneAndUpdate({ pid }, data, {
+      new: true,
+      runValidators: true,
+    });
+    if (!product) return res.status(404).json({ message: 'Không tìm thấy sản phẩm' });
+    res.json(product);
+  })
+);
 
 // DELETE
-app.delete('/api/products/:pid', async (req, res) => {
-  const pid = parsePid(req, res);
-  if (pid === null) return;
-  const product = await Product.findOneAndDelete({ pid });
-  if (!product) return res.status(404).json({ message: 'Không tìm thấy sản phẩm' });
-  res.json({ message: 'Đã xóa', product });
-});
+app.delete(
+  '/api/products/:pid',
+  wrap(async (req, res) => {
+    const pid = parsePid(req, res);
+    if (pid === null) return;
+    const product = await Product.findOneAndDelete({ pid });
+    if (!product) return res.status(404).json({ message: 'Không tìm thấy sản phẩm' });
+    res.json({ message: 'Đã xóa', product });
+  })
+);
 
 // Xử lý lỗi chung
 app.use((err, req, res, next) => {
