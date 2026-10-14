@@ -63,7 +63,8 @@ jobs:
       - name: Đăng xuất
         if: always()
         run: docker logout
-    deploy-local:
+
+  deploy-local:
     needs: push-dockerhub
     if: github.ref == 'refs/heads/main'
     runs-on: self-hosted
