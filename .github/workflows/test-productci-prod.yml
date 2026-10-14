@@ -13,7 +13,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Lấy mã nguồn
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Dựng API và MongoDB bằng Docker Compose
         run: docker compose up -d --build --wait --wait-timeout 120
